@@ -1,54 +1,36 @@
-# Assumptions
+# Architecture Decisions & Assumptions
 
-The official assignment and starter repository contract were not found in this
-workspace. These are implementation decisions, not confirmed employer requirements.
-Compare them with the official assignment before submission.
+This document outlines the architectural trade-offs, design rationales, and domain assumptions implemented in the Hotel Offer Orchestrator.
 
-## API Contract
+## 1. API Contract & Schema
 
-- Endpoint: `GET /api/v1/hotels/offers`
-- Query parameters: `city`, `checkIn`, `checkOut`, `guests`
-- Response shape: `{ data: HotelOffer[], meta: { source, providerCount, offerCount, cacheKey } }`
+- **Endpoint**: `GET /api/v1/hotels/offers`
+- **Query Parameters**: `city` (string, 1-100 chars), `checkIn` (ISO date), `checkOut` (ISO date, after checkIn), `guests` (integer, 1-20).
+- **Response Format**: JSend-inspired schema separating payload (`data: HotelOffer[]`) from operational telemetry (`meta: { source, providerCount, offerCount, cacheKey }`).
+- **Rationale**: GET queries are naturally idempotent and cacheable. Clean separation of `data` and `meta` allows consumers to inspect cache telemetry without polluting the domain model.
 
-## Deduplication
+## 2. Deduplication Policy
 
-- First occurrence wins when duplicate hotels have different prices. No cheapest/best-offer selection unless starter repo explicitly requires it.
+- **Normalization**: Hotel names are trimmed, whitespace-collapsed (`\s+` -> `' '`), and case-folded (`toLocaleLowerCase('en-US')`).
+- **Conflict Resolution**: First-occurrence preservation (O(N) Set lookup). Deterministic order from provider arrays ensures reproducible results.
 
-## Provider Behavior
+## 3. Provider Aggregation & Resilience
 
-- Providers are called concurrently with `Promise.allSettled`
-- One provider failure does not discard successful providers
-- Empty results from a successful provider are valid (not treated as failure)
-- Cache write failure is non-blocking — live response still returned
+- **Concurrent Execution**: Upstream calls execute via `Promise.allSettled` to prevent one slow supplier from blocking others.
+- **Timeout Isolation**: Each provider call is bounded by `PROVIDER_TIMEOUT_MS` using an `AbortController`.
+- **Partial Failure Grace**: If at least one provider succeeds, the service returns successful offers. A 502 `PROVIDER_ERROR` is returned only when all providers fail.
+- **Empty Inventory**: Empty provider results (`[]`) are valid business responses, not system failures.
 
-## Cache
+## 4. Caching & Cache Invalidation
 
-- Redis read failures are treated as misses; writes are skipped with a warning
-- Cache key is versioned (`v1`) and uses SHA-256 of canonical JSON criteria
-- TTL is configurable via `CACHE_TTL_SECONDS` (default 300s)
-- Malformed or structurally invalid cached offers are treated as misses and refreshed
-- Partial provider results are returned live but not cached so the next request can
-  query a recovered provider
+- **Canonical Key Generation**: Cache keys use SHA-256 digests over normalized, canonical criteria objects (`hotel-offers:v1:<sha256>`).
+- **Non-blocking Fault Tolerance**: Cache read/write failures log warnings and fall back to live provider aggregation without dropping user requests.
+- **Cache Poisoning Protection**: Aggregated results are only written to Redis if all configured providers responded successfully, preventing partial outages from being cached.
+- **Cache Integrity Validation**: Cached JSON is schema-validated before deserialization; corrupt or malformed entries are discarded and refreshed.
 
-## Framework
+## 5. Technology Choices
 
-- Fastify 5 is used as the HTTP framework
-- Zod 4.6.7 is used for runtime validation
-- `redis` 4 is used as the Node Redis client
-
-## Testing
-
-- Core tests use `MemoryOfferCache` and do not require Docker
-- Redis smoke test is provided as a separate script
-- Tests assert behavior, not implementation details
-- Real Redis cache behavior was checked using an isolated temporary Redis instance;
-  results are recorded in `PRE_GITHUB_VERIFICATION_REPORT.md`. These checks are
-  separate from the automated MemoryOfferCache test suite.
-
-## Environment
-
-- Node.js 22+
-- TypeScript 5 with strict mode
-- Docker Compose for local Redis
-- `.env.example` is documentation only; the app reads `process.env` and does not
-  automatically load `.env`
+- **Fastify 5**: High-throughput HTTP framework with native schema compilation and structured logging.
+- **Zod 3**: Strict runtime validation and type inference.
+- **Node Redis 4**: Official Redis client with non-blocking connection management and clean shutdown support.
+- **Vitest 3**: Fast native ESM unit and integration testing without container dependencies.

@@ -1,19 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { createRequire } from 'node:module';
-
-const require = createRequire(import.meta.url);
-const { createClient } = require('redis') as {
-  createClient: (options: { url: string }) => {
-    on(event: string, listener: (error: unknown) => void): void;
-    isOpen: boolean;
-    connect(): Promise<void>;
-    ping(): Promise<string>;
-    set(key: string, value: string, options: { EX: number }): Promise<unknown>;
-    get(key: string): Promise<string | null>;
-    del(key: string): Promise<unknown>;
-    quit(): Promise<void>;
-  };
-};
+import { createClient } from 'redis';
 
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://localhost:6379';
 

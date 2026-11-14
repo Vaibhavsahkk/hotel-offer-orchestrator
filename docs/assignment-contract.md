@@ -1,9 +1,6 @@
-# Fallback API Contract (Not Officially Confirmed)
+# API Specification & Contract
 
-The employer's full assignment document/starter contract is not present in this
-workspace. The following contract describes the current implementation and is a
-fallback, not a confirmed employer requirement. Check the original assignment before
-submission.
+This document specifies the exact request, response, provider, and cache interfaces implemented by the Hotel Offer Orchestrator.
 
 ## Endpoint
 

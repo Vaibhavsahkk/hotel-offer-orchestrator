@@ -1,14 +1,5 @@
-import { createRequire } from 'node:module';
-import type { RedisClientType } from 'redis';
+import { createClient, type RedisClientType } from 'redis';
 import type { OfferCache } from '../types/domain.js';
-
-const require = createRequire(import.meta.url);
-const { createClient } = require('redis') as {
-  createClient: (options: {
-    url: string;
-    socket: { connectTimeout: number; reconnectStrategy: false };
-  }) => RedisClientType;
-};
 
 export class RedisOfferCache implements OfferCache {
   private readonly client: RedisClientType;

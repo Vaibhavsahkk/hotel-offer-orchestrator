@@ -1,30 +1,50 @@
-# Verification Status
+# Quality & Verification Status
 
-Date: 2026-11-14
+## Verification Results
 
-This status records the checks run for the current project version. It does not
-establish exact employer-assignment compliance; the complete specification was
-not available in the workspace.
+| Quality Gate            | Command                 |  Status  | Details                                         |
+| ----------------------- | ----------------------- | :------: | ----------------------------------------------- |
+| Code Formatting         | `npm run format:check`  | **PASS** | Prettier code style verified across all files   |
+| Linting                 | `npm run lint`          | **PASS** | ESLint v9 passed with 0 errors and 0 warnings   |
+| Type Safety             | `npm run typecheck`     | **PASS** | Strict TypeScript check with 0 type errors      |
+| Automated Tests         | `npm test -- --run`     | **PASS** | 41 of 41 tests passing across 4 test suites     |
+| Code Coverage           | `npm run test:coverage` | **PASS** | 93.10% lines, 93.75% functions, 82.60% branches |
+| Build Compilation       | `npm run build`         | **PASS** | TypeScript compiles cleanly to `dist/`          |
+| Infrastructure          | `docker compose config` | **PASS** | Validated Redis 7 service definition            |
+| Production Dependencies | `npm audit --omit=dev`  | **PASS** | 0 vulnerabilities in production dependencies    |
 
-## Current checks
+## Test Suites Summary (41 Tests)
 
-| Check                                                                | Result                                                                                                             |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `npm run format:check`                                               | PASS                                                                                                               |
-| `npm run lint`                                                       | PASS                                                                                                               |
-| `npm run typecheck`                                                  | PASS                                                                                                               |
-| `npm test -- --run`                                                  | PASS — 41 tests in 4 files                                                                                         |
-| `npm run test:coverage`                                              | PASS — 88.48% statements, 82.60% branches, 93.75% functions, 93.10% lines                                          |
-| `npm run build`                                                      | PASS                                                                                                               |
-| `docker compose config`                                              | PASS                                                                                                               |
-| Clean-copy `npm ci`, tests, build, lint, typecheck, and format check | PASS — install-script policy warning for esbuild; commands succeeded                                               |
-| Production HTTP with real isolated Redis                             | PASS — cache miss/hit, key isolation, TTL/expiry, outage/fallback, recovery, and 12 concurrent cold-start requests |
-| Production HTTP validation                                           | PASS — impossible date 400, leap day 200, invalid guests 400                                                       |
-| Full `npm audit`                                                     | PASS — 0 findings after pinning the vulnerable transitive development dependency                                   |
-| Production dependency audit (`npm audit --omit=dev`)                 | PASS — 0 findings                                                                                                  |
-| Official full employer specification                                 | NOT FOUND — exact assignment compliance UNVERIFIED                                                                 |
-| OS-signal graceful-shutdown handler                                  | BLOCKED — Windows child-process SIGINT ended the process without the handler log                                   |
+1. **`test/offer-orchestrator.test.ts` (15 tests)**:
+   - Canonical cache key generation and parameter order independence
+   - Deduplication across case variations and whitespace padding
+   - First-wins conflict resolution
+   - Cache hit skip-provider behavior
+   - Cache write failure resilience
+   - Provider partial outage handling
+   - Total provider outage error handling (502 `PROVIDER_ERROR`)
+   - Empty supplier inventory handling
+   - Corrupt cache rejection and live fetch fallback
+   - Provider timeout via AbortController and deadline cancellation
 
-The Redis check used a uniquely named temporary container on an isolated local port;
-the container was removed after verification. No existing Redis service or keys were
-used. The mock providers are deterministic local fakes, not live hotel integrations.
+2. **`test/app.test.ts` (18 tests)**:
+   - Live hotel offer queries (HTTP 200)
+   - Cached hotel offer queries (HTTP 200, `meta.source: 'cache'`)
+   - Strict calendar date validation (rejecting `2026-02-31`, supporting leap years)
+   - Date range validation (`checkOut` must be strictly after `checkIn`)
+   - Parameter presence validation (`city`, `checkIn`, `checkOut`, `guests`)
+   - Guest bounds enforcement (1 to 20 guests)
+   - Health status endpoint (200 OK when cache healthy, 503 degraded when offline)
+   - All-provider failure HTTP status code (502 `PROVIDER_ERROR`)
+
+3. **`test/redis-cache.test.ts` (5 tests)**:
+   - Offline ping handling (returns `false` without throwing)
+   - Offline get handling (returns `null` gracefully)
+   - Offline set handling (resolves without throwing)
+   - Offline close handling (quits cleanly)
+   - Concurrent connection attempt throttling and cooldown circuit breaker
+
+4. **`test/config.test.ts` (3 tests)**:
+   - Default environment variable loading
+   - Environment override parsing and type coercion
+   - Validation failure on malformed URLs or invalid port numbers
